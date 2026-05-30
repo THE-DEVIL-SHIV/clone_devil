@@ -1,0 +1,138 @@
+import asyncio
+from pyrogram import Client, filters
+from pyrogram.types import Message
+from pyrogram.errors import (
+    SessionPasswordNeeded, FloodWait,
+    PhoneNumberInvalid, ApiIdInvalid,
+    PhoneCodeInvalid, PhoneCodeExpired,
+    UserDeactivated, AuthKeyUnregistered,
+    PasswordHashInvalid
+)
+from PritiMusic.utils.database import clonebotdb
+from config import API_ID, API_HASH, OWNER_ID
+
+POWERED_BY = "\n\n🤞 **𝐏ᴏᴡєʀєᴅ 𝐁ʏ ➛ BETA BOTS.🙂❤️**"
+SESSION_ADVICE = "\n\n💡 **Tip:** You can directly generate your Session String easily and safely from here: @SHIV_SESSION_BOT"
+
+# ==========================================
+# 1. CONNECT ASSISTANT (Phone + OTP)
+# ==========================================
+@Client.on_message(filters.command(["connect"]) & filters.private)
+async def connect_assistant(client: Client, message: Message):
+    bot_id = client.me.id
+    user = message.from_user
+
+    clone_data = await clonebotdb.find_one({"bot_id": bot_id})
+    if not clone_data:
+        return await message.reply_text("❌ **Error:** Bot data not found in the database.")
+
+    if clone_data["user_id"] != user.id and user.id != OWNER_ID:
+        return await message.reply_text("❌ **Access Denied:** Only the bot owner can perform this action.")
+
+    await message.reply_text(
+        "⚡ **Connect Assistant**\n"
+        "I will help you connect your account safely.\n\n"
+        "🛑 Type `/cancel` anytime to stop." + SESSION_ADVICE
+    )
+
+    try:
+        phone_msg = await message.chat.ask(
+            "📲 **Please send your Telegram Phone Number:**\n"
+            "(Example: `+919876543210`)\n\n"
+            "⚠️ **Don't forget the Country Code!**",
+            timeout=300
+        )
+    except Exception:
+        return await message.reply("❌ Time limit exceeded. Please try again.")
+
+    if not phone_msg.text or phone_msg.text == "/cancel":
+        return await message.reply("❌ Process Cancelled.")
+
+    phone_number = phone_msg.text.strip()
+    msg = await message.reply("🔄 **Connecting to Server...**")
+    
+    temp_client = Client(name=f"connect_{bot_id}", api_id=API_ID, api_hash=API_HASH, in_memory=True)
+    
+    try:
+        await temp_client.connect()
+    except Exception as e:
+        await msg.edit(f"❌ **Connection Failed:** `{str(e)}`")
+        return
+
+    try:
+        try:
+            code = await temp_client.send_code(phone_number)
+        except PhoneNumberInvalid:
+            await msg.edit("❌ **Invalid Phone Number!** Please send in correct format (Ex: +91...).")
+            return
+        except FloodWait as e:
+            await msg.edit(f"❌ **FloodWait:** Please wait for {e.value} seconds.")
+            return
+        except Exception as e:
+            await msg.edit(f"❌ **Error:** `{e}`")
+            return
+
+        await msg.delete()
+
+        try:
+            otp_msg = await message.chat.ask(
+                "📩 **OTP Sent!**\n\n"
+                "Check your Telegram messages. Send the OTP code like this:\n"
+                "Format: `1 2 3 4 5` (Space between each number)",
+                timeout=300
+            )
+        except Exception:
+            return await message.reply("❌ Time limit exceeded.")
+
+        if not otp_msg.text or otp_msg.text == "/cancel":
+            return await message.reply("❌ Process Cancelled.")
+
+        otp = otp_msg.text.replace(" ", "").strip()
+
+        try:
+            await temp_client.sign_in(phone_number, code.phone_code_hash, otp)
+        except SessionPasswordNeeded:
+            pwd_msg = await message.chat.ask("🔐 **Two-Step Verification:**\nEnter your 2FA password:", timeout=300)
+            await temp_client.check_password(password=pwd_msg.text)
+        except Exception as e:
+            await message.reply(f"❌ **Error:** `{str(e)}`")
+            return
+
+        string_session = await temp_client.export_session_string()
+        await clonebotdb.update_one({"bot_id": bot_id}, {"$set": {"session_string": string_session}})
+        
+        await message.reply_text("✅ **Connected Successfully!**" + POWERED_BY)
+    finally:
+        if temp_client.is_connected:
+            await temp_client.disconnect()
+
+# ==========================================
+# 2. MANUAL SET STRING (Paste String)
+# ==========================================
+@Client.on_message(filters.command(["setstring", "setmode"]) & filters.private)
+async def set_clone_session(client: Client, message: Message):
+    bot_id = client.me.id
+    if len(message.command) < 2:
+        return await message.reply_text("⚠️ **Usage:** `/setstring <Session_String>`" + SESSION_ADVICE)
+
+    string_session = message.text.split(None, 1)[1].strip()
+    msg = await message.reply_text("🔄 **Processing String...**")
+
+    try:
+        new_assistant = Client(f"Ass_{bot_id}", api_id=API_ID, api_hash=API_HASH, session_string=string_session, in_memory=True)
+        await new_assistant.start()
+        client.assistant = new_assistant
+
+        await clonebotdb.update_one({"bot_id": bot_id}, {"$set": {"session_string": string_session}})
+        await msg.edit("✅ **Connected Successfully!** 🎸 **Now you can play music!**" + POWERED_BY)
+    except Exception as e:
+        await msg.edit(f"❌ **Error:** `{str(e)}`")
+
+# ==========================================
+# 3. DISCONNECT
+# ==========================================
+@Client.on_message(filters.command(["disconnect", "delstring"]) & filters.private)
+async def disconnect_assistant(client: Client, message: Message):
+    bot_id = client.me.id
+    await clonebotdb.update_one({"bot_id": bot_id}, {"$unset": {"session_string": 1}})
+    await message.reply_text("✅ **Disconnected Successfully!**" + POWERED_BY)
