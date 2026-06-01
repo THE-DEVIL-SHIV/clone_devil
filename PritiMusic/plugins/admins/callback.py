@@ -105,13 +105,16 @@ async def support_page_cb(client, CallbackQuery, _):
         reply_markup=InlineKeyboardMarkup(custom_support_buttons)
     )
 
-# --- SOURCE PAGE (FIXED WEBPAGE_MEDIA_EMPTY) ---
+# --- SOURCE PAGE (FILE ID FIXED & SPOILER ADDED) ---
 @app.on_callback_query(filters.regex("gib_source"))
 async def gib_repo_callback(_, callback_query):
     try:
+        # SHIV BHAI: Niche wale string mein apna lamba wala Video File ID paste karein!
+        video_file_id = "BAACAgUAAxkBAAEp8WFqHUszcBhi255PaVPowqE-NO6K3QACBSIAAi898VShBdGOT0OuNDsE"
+        
         await callback_query.edit_message_media(
             media=InputMediaVideo(
-                media="https://files.catbox.moe/p8t5d8.mp4", 
+                media=video_file_id, 
                 caption="REPO = ||ᴘʜᴇʟᴀ ᴅᴇᴠɪʟ ᴋᴏ ᴘᴀᴘᴀ ʙᴏʟ ᴄʜᴀʟ ʙᴏʟ😎||"
             ),
             reply_markup=InlineKeyboardMarkup(
@@ -124,8 +127,9 @@ async def gib_repo_callback(_, callback_query):
             ),
         )
     except WebpageMediaEmpty:
-        # Fallback agar video load na ho paye
-        await callback_query.answer("Video load nahi ho payi, baad mein try karein.", show_alert=True)
+        await callback_query.answer("Media load nahi hua. Kripya URL ki jagah File ID use karein.", show_alert=True)
+    except Exception as e:
+        await callback_query.answer(f"Error: {str(e)}", show_alert=True)
 
 @app.on_callback_query(filters.regex("unban_assistant"))
 async def unban_assistant(_, callback: CallbackQuery):
@@ -137,7 +141,7 @@ async def unban_assistant(_, callback: CallbackQuery):
     except Exception:
         await callback.answer("Failed to unban. Give me Admin permissions.", show_alert=True)
 
-# --- ADMIN COMMANDS (FIXED LIST INDEX OUT OF RANGE) ---
+# --- ADMIN COMMANDS ---
 @app.on_callback_query(filters.regex("ADMIN") & ~BANNED_USERS)
 @languageCB
 async def del_back_playlist(client, CallbackQuery, _):
@@ -275,7 +279,6 @@ async def del_back_playlist(client, CallbackQuery, _):
             caption=_["stream_1"].format(f"https://t.me/{app.username}?start=info_{videoid}", title[:23], duration, user),
             reply_markup=InlineKeyboardMarkup(button),
         )
-        # Yahan safe update ho raha hai
         if chat_id in db and len(db[chat_id]) > 0:
             db[chat_id][0]["mystic"] = run
             db[chat_id][0]["markup"] = "tg"
