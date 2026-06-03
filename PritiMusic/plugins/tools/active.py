@@ -27,50 +27,104 @@ async def get_chat_link(chat_id: int) -> str:
     except:
         return f"https://t.me/c/{str(chat_id)[4:]}/1"
 
-# --- MAIN BOT COMMANDS ---
+
+# ===================================================
+# MAIN BOT COMMANDS (EXCLUDES CLONES)
+# ===================================================
 
 @app.on_message(filters.command(["activevc", "vc", "activevoice"]) & SUDOERS)
 async def active_voice_chats(_, message: Message):
-    mystic = await message.reply_text("🔄 **Fetching active voice chats...**")
-    served_chats = await get_active_chats()
-    if not served_chats:
-        return await mystic.edit_text(f"📭 **No active voice chats.**\n\n{POWERED_BY}")
+    mystic = await message.reply_text("🔄 **Fetching Main Bot's active voice chats...**")
+    raw_active_chats = await get_active_chats()
     
-    text, j = "🎤 **Active Voice Chats:**\n\n", 0
-    for chat_id in served_chats:
+    if not raw_active_chats:
+        return await mystic.edit_text(f"📭 **No active voice chats globally.**\n\n{POWERED_BY}")
+
+    # Fetch all clones and their served chats
+    all_clones = await clonebotdb.find({}).to_list(length=None)
+    clone_chat_ids = set()
+    for clone in all_clones:
+        bot_id = clone.get("bot_id")
+        if bot_id:
+            try:
+                served = await get_served_chats_clone(bot_id)
+                for c in served:
+                    clone_chat_ids.add(int(c["chat_id"]))
+            except: continue
+    
+    # Filter out clones from main active chats
+    main_bot_chats = []
+    for cid in raw_active_chats:
         try:
-            chat = await app.get_chat(int(chat_id)) # Int casting
-            link = await get_chat_link(int(chat_id))
+            if int(cid) not in clone_chat_ids:
+                main_bot_chats.append(int(cid))
+        except: continue
+            
+    if not main_bot_chats:
+        return await mystic.edit_text(f"📭 **Main Bot has no active voice chats right now.**\n*(Clone bots might be playing though)*\n\n{POWERED_BY}")
+
+    text, j = "🎤 **Main Bot Active Voice Chats:**\n\n", 0
+    for chat_id in main_bot_chats:
+        try:
+            chat = await app.get_chat(chat_id)
+            link = await get_chat_link(chat_id)
             text += f"**{j + 1}.** [{unidecode(chat.title)[:25]}]({link}) `[{chat_id}]`\n"
             j += 1
         except: continue
     await mystic.edit_text(f"{text}\n{POWERED_BY}", disable_web_page_preview=True)
+
 
 @app.on_message(filters.command(["activevideo", "av", "activev"]) & SUDOERS)
 async def active_video_chats(_, message: Message):
-    mystic = await message.reply_text("🔄 **Fetching active video chats...**")
-    served_chats = await get_active_video_chats()
-    if not served_chats:
-        return await mystic.edit_text(f"📭 **No active video chats.**\n\n{POWERED_BY}")
+    mystic = await message.reply_text("🔄 **Fetching Main Bot's active video chats...**")
+    raw_active_chats = await get_active_video_chats()
     
-    text, j = "📹 **Active Video Chats:**\n\n", 0
-    for chat_id in served_chats:
+    if not raw_active_chats:
+        return await mystic.edit_text(f"📭 **No active video chats globally.**\n\n{POWERED_BY}")
+
+    # Fetch all clones and their served chats
+    all_clones = await clonebotdb.find({}).to_list(length=None)
+    clone_chat_ids = set()
+    for clone in all_clones:
+        bot_id = clone.get("bot_id")
+        if bot_id:
+            try:
+                served = await get_served_chats_clone(bot_id)
+                for c in served:
+                    clone_chat_ids.add(int(c["chat_id"]))
+            except: continue
+    
+    # Filter out clones from main active video chats
+    main_bot_chats = []
+    for cid in raw_active_chats:
         try:
-            chat = await app.get_chat(int(chat_id))
-            link = await get_chat_link(int(chat_id))
+            if int(cid) not in clone_chat_ids:
+                main_bot_chats.append(int(cid))
+        except: continue
+            
+    if not main_bot_chats:
+        return await mystic.edit_text(f"📭 **Main Bot has no active video chats right now.**\n\n{POWERED_BY}")
+
+    text, j = "📹 **Main Bot Active Video Chats:**\n\n", 0
+    for chat_id in main_bot_chats:
+        try:
+            chat = await app.get_chat(chat_id)
+            link = await get_chat_link(chat_id)
             text += f"**{j + 1}.** [{unidecode(chat.title)[:25]}]({link}) `[{chat_id}]`\n"
             j += 1
         except: continue
     await mystic.edit_text(f"{text}\n{POWERED_BY}", disable_web_page_preview=True)
 
-# --- CLONE COMMANDS ---
+
+# ===================================================
+# CLONE COMMANDS (FIXED INTEGER LOGIC)
+# ===================================================
 
 @app.on_message(filters.command(["cvc"]) & SUDOERS)
 async def clone_vc_stats(_, message: Message):
     mystic = await message.reply_text("🔄 **Fetching active clone voice chats...**")
     all_clones = await clonebotdb.find({}).to_list(length=None)
     
-    # 🔴 FIX: Convert all active chats to strict integers
     raw_active_chats = await get_active_chats()
     active_chats_ints = [int(chat) for chat in raw_active_chats] if raw_active_chats else []
     
@@ -85,16 +139,12 @@ async def clone_vc_stats(_, message: Message):
         if not bot_id: continue
         
         served = await get_served_chats_clone(bot_id)
-        # 🔴 FIX: Strict integer comparison
         ids = [int(c["chat_id"]) for c in served]
         
-        # Checking intersection properly
         active_in_this = list(set(active_chats_ints).intersection(set(ids)))
         
         if active_in_this:
             has_active = True
-            
-            # Bot Details Fetching
             try:
                 bot = await app.get_users(bot_id)
                 bot_name = bot.first_name
@@ -118,6 +168,7 @@ async def clone_vc_stats(_, message: Message):
         return await mystic.edit_text(f"📭 **No active clone voice chats.**\n*(If bots are playing but not showing, your clone core isn't saving data to the global DB)*\n\n{POWERED_BY}")
         
     await mystic.edit_text(f"{text}{POWERED_BY}", disable_web_page_preview=True)
+
 
 @app.on_message(filters.command(["cvvc"]) & SUDOERS)
 async def clone_vvc_stats(_, message: Message):
@@ -166,11 +217,13 @@ async def clone_vvc_stats(_, message: Message):
         
     await mystic.edit_text(f"{text}{POWERED_BY}", disable_web_page_preview=True)
 
-# --- TOTAL VC COMMAND (NEW) ---
+
+# ===================================================
+# TOTAL VC COMMAND
+# ===================================================
 
 @app.on_message(filters.command(["tvc", "totalvc"]) & SUDOERS)
 async def total_vc_chats(_, message: Message):
-    # Safe counting logic
     raw_vc = await get_active_chats()
     raw_vvc = await get_active_video_chats()
     
@@ -183,12 +236,15 @@ async def total_vc_chats(_, message: Message):
         f"🎙️ **Total Active VC:** `{tvc}`\n"
         f"📹 **Total Active VVC:** `{tvvc}`\n"
         f"🔥 **Overall Playing:** `{total_combined}`\n\n"
-        f"*(Includes Main Bot and Clones IF database is shared)*\n\n"
+        f"*(Includes Main Bot and Clones)*\n\n"
         f"{POWERED_BY}"
     )
     await message.reply_text(text)
 
-# --- ASTATS & CALLBACKS ---
+
+# ===================================================
+# ASTATS & CALLBACKS
+# ===================================================
 
 @app.on_message(filters.command(["astats"]) & SUDOERS)
 async def astats(_, message: Message):
@@ -202,7 +258,7 @@ async def astats(_, message: Message):
         f"📊 **PritiMusic Stats**\n\n"
         f"🌐 **Total Active VC:** `{tvc}`\n"
         f"🌐 **Total Active VVC:** `{tvvc}`\n"
-        f"*(Note: Count relies on global database)*\n\n"
+        f"*(Note: Count includes Main Bot & All Clones)*\n\n"
         f"{POWERED_BY}"
     )
     
