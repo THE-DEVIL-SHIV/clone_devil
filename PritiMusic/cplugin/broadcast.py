@@ -32,13 +32,16 @@ async def broadcast_message(client, message: Message, _):
     bot_obj = await client.get_me()
     bot_id = bot_obj.id
     
+    # 👇 CLONE OWNER CHECK WAPAS LAGA DIYA (PREMIUM MSG HATA KAR) 👇
     try:
         clone_owner_id = await get_owner_id_from_db(bot_id)
     except:
         clone_owner_id = get_owner_id_from_db(bot_id)
         
     if message.from_user.id not in [OWNER_ID, clone_owner_id]:
-        return await message.reply_text(_["c_brod_1"].format(SUPPORT_CHAT))
+        # Premium error 'c_brod_1' ki jagah simple Not Authorized error dega
+        return await message.reply_text(_["NOT_C_OWNER"].format(SUPPORT_CHAT))
+    # 👆 YAHAN TAK 👆
 
     if IS_BROADCASTING:
         return await message.reply_text("⏳ **Broadcast is already running. Please wait.**")
