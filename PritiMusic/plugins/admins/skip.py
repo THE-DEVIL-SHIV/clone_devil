@@ -1,263 +1,81 @@
 import random
 from pyrogram import filters
-from pyrogram.types import InlineKeyboardMarkup, Message
+from pyrogram.types import Message
 
 import config
-from PritiMusic import YouTube, app
+from PritiMusic import app
 from PritiMusic.core.call import Lucky
 from PritiMusic.misc import db
 
-# ✅ Sirf jo zaroori hai wahi import kiya hai
-from PritiMusic.utils.database import get_loop, get_assistant 
+# ✅ Sirf jo zaroori hai wahi import kiya
+from PritiMusic.utils.database import get_loop
 from PritiMusic.utils.decorators import AdminRightsCheck
-from PritiMusic.utils.inline import close_markup, stream_markup, stream_markup2
+from PritiMusic.utils.inline import close_markup
 from PritiMusic.utils.stream.autoclear import auto_clean
-from PritiMusic.utils.thumbnails import get_thumb
 from config import BANNED_USERS
 
-# ✅ Helper for Random Image
-def get_random_img(img_list):
-    if img_list:
-        if isinstance(img_list, list):
-            return random.choice(img_list)
-        return img_list
-    return "https://telegra.ph/file/2e3d368e77c449c287430.jpg" # Fallback
 
 @app.on_message(
     filters.command(["skip", "cskip", "next", "cnext"], prefixes=["/", "!"]) & filters.group & ~BANNED_USERS
 )
 @AdminRightsCheck
 async def skip(cli, message: Message, _, chat_id):
-    if not len(message.command) < 2:
-        loop = await get_loop(chat_id)
-        if loop != 0:
-            return await message.reply_text(_["admin_8"])
+    # Queue check karte hain
+    check = db.get(chat_id)
+    if not check:
+        return await message.reply_text(_["queue_2"])
+        
+    # Loop on/off check
+    loop = await get_loop(chat_id)
+    if loop != 0:
+        return await message.reply_text(_["admin_8"])
+
+    # Multi-skip logic (jaise /skip 3)
+    if len(message.command) > 1:
         state = message.text.split(None, 1)[1].strip()
         if state.isnumeric():
             state = int(state)
-            check = db.get(chat_id)
-            if check:
-                count = len(check)
-                if count > 2:
-                    count = int(count - 1)
-                    if 1 <= state <= count:
-                        for x in range(state):
-                            popped = None
-                            try:
-                                popped = check.pop(0)
-                            except:
-                                return await message.reply_text(_["admin_12"])
+            count = len(check)
+            if count > 2:
+                count = int(count - 1)
+                if 1 <= state <= count:
+                    for x in range(state - 1): # (state-1) elements pop karenge
+                        try:
+                            popped = check.pop(0)
                             if popped:
                                 await auto_clean(popped)
-                    else:
-                        return await message.reply_text(_["admin_11"].format(count))
+                        except:
+                            pass
                 else:
-                    return await message.reply_text(_["admin_10"])
+                    return await message.reply_text(_["admin_11"].format(count))
             else:
-                return await message.reply_text(_["queue_2"])
+                return await message.reply_text(_["admin_10"])
         else:
-            return await message.reply_text(_["admin_9"])
-    else:
-        check = db.get(chat_id)
-        if not check:
-            return await message.reply_text(_["queue_2"])
-        
-        try:
-            # 🟢 THE REAL FIX (DOUBLE POP BYPASS) 🟢
-            # Agar queue me sirf 1 track hai (jo currently chal raha hai), 
-            # toh usko yaha pop mat karo. Seedha change_stream ko handle karne do.
-            # Wo bina crash hue Autoplay ko trigger kar dega!
-            if len(check) == 1:
-                try:
-                    assistant = await get_assistant(chat_id)
-                except:
-                    assistant = Lucky.one
-                return await Lucky.change_stream(assistant, chat_id)
-            else:
-                popped = check.pop(0)
-                if popped:
-                    await auto_clean(popped)
-        except Exception:
-            try:
-                await message.reply_text(
-                    text=_["admin_6"].format(
-                        message.from_user.mention, message.chat.title
-                    ),
-                    reply_markup=close_markup(_),
-                )
-                return await Lucky.stop_stream(chat_id)
-            except:
-                return
+            return await message.reply_text(_["admin_11"].format(len(check)-1))
 
-    # Jab upar wali conditions pass ho jayengi, toh ye agla gaana chalayega
-    queued = check[0]["file"]
-    title = (check[0]["title"]).title()
-    user = check[0]["by"]
-    streamtype = check[0]["streamtype"]
-    videoid = check[0]["vidid"]
-    status = True if str(streamtype) == "video" else None
-    
-    if db.get(chat_id) and len(db.get(chat_id)) > 0:
-        db[chat_id][0]["played"] = 0
-        exis = (check[0]).get("old_dur")
-        if exis:
-            db[chat_id][0]["dur"] = exis
-            db[chat_id][0]["seconds"] = check[0]["old_second"]
-            db[chat_id][0]["speed_path"] = None
-            db[chat_id][0]["speed"] = 1.0
-            
-    if "live_" in queued:
-        n, link = await YouTube.video(videoid, True)
-        if n == 0:
-            return await message.reply_text(_["admin_7"].format(title))
-        try:
-            image = await YouTube.thumbnail(videoid, True)
-        except:
-            image = None
-        try:
-            await Lucky.skip_stream(chat_id, link, video=status, image=image)
-        except:
-            return await message.reply_text(_["call_6"])
-        button = stream_markup2(_, chat_id)
-        
-        img = await get_thumb(videoid, message.from_user.id, message.from_user.first_name)
-        if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
-
-        run = await message.reply_photo(
-            photo=img,
-            caption=_["stream_1"].format(
-                f"https://t.me/{app.username}?start=info_{videoid}",
-                title[:23],
-                check[0]["dur"],
-                user,
-            ),
-            reply_markup=InlineKeyboardMarkup(button),
-            has_spoiler=False 
-        )
-        if db.get(chat_id) and len(db.get(chat_id)) > 0:
-            db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "tg"
-            
-    elif "vid_" in queued:
-        mystic = await message.reply_text(_["call_7"], disable_web_page_preview=True)
-        try:
-            file_path, direct = await YouTube.download(
-                videoid,
-                mystic,
-                videoid=True,
-                video=status,
-            )
-        except:
-            return await mystic.edit_text(_["call_6"])
-        try:
-            image = await YouTube.thumbnail(videoid, True)
-        except:
-            image = None
-        try:
-            await Lucky.skip_stream(chat_id, file_path, video=status, image=image)
-        except:
-            return await mystic.edit_text(_["call_6"])
-        button = stream_markup(_, chat_id)
-        
-        img = await get_thumb(videoid, message.from_user.id, message.from_user.first_name)
-        if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
-
-        run = await message.reply_photo(
-            photo=img,
-            caption=_["stream_1"].format(
-                f"https://t.me/{app.username}?start=info_{videoid}",
-                title[:23],
-                check[0]["dur"],
-                user,
-            ),
-            reply_markup=InlineKeyboardMarkup(button),
-            has_spoiler=False 
-        )
-        if db.get(chat_id) and len(db.get(chat_id)) > 0:
-            db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "stream"
-        await mystic.delete()
-        
-    elif "index_" in queued:
-        try:
-            await Lucky.skip_stream(chat_id, videoid, video=status)
-        except:
-            return await message.reply_text(_["call_6"])
-        button = stream_markup2(_, chat_id)
-        
-        run = await message.reply_photo(
-            photo=get_random_img(config.STREAM_IMG_URL),
-            caption=_["stream_2"].format(user),
-            reply_markup=InlineKeyboardMarkup(button),
-            has_spoiler=False 
-        )
-        if db.get(chat_id) and len(db.get(chat_id)) > 0:
-            db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "tg"
-            
-    else:
-        if videoid == "telegram":
-            image = None
-        elif videoid == "soundcloud":
-            image = None
-        else:
-            try:
-                image = await YouTube.thumbnail(videoid, True)
-            except:
-                image = None
-        try:
-            await Lucky.skip_stream(chat_id, queued, video=status, image=image)
-        except:
-            return await message.reply_text(_["call_6"])
-            
-        if videoid == "telegram":
-            button = stream_markup2(_, chat_id)
-            tg_img = get_random_img(config.TELEGRAM_AUDIO_URL) if str(streamtype) == "audio" else get_random_img(config.TELEGRAM_VIDEO_URL)
-
-            run = await message.reply_photo(
-                photo=tg_img,
-                caption=_["stream_1"].format(
-                    config.SUPPORT_CHAT, title[:23], check[0]["dur"], user
-                ),
-                reply_markup=InlineKeyboardMarkup(button),
-                has_spoiler=False 
-            )
-            if db.get(chat_id) and len(db.get(chat_id)) > 0:
-                db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "tg"
+    # 🟢 THE REAL FIX FOR THE SCREENSHOT ERROR 🟢
+    try:
+        # Sahi PyTgCalls client (assistant) nikalte hain taaki internal error na aaye
+        pytgcalls_client = Lucky.one
+        if chat_id in Lucky.active_clients:
+            val = Lucky.active_clients[chat_id]
+            if isinstance(val, list) and len(val) > 0:
+                pytgcalls_client = val[0]
+            elif val and not isinstance(val, list):
+                pytgcalls_client = val
                 
-        elif videoid == "soundcloud":
-            button = stream_markup2(_, chat_id)
-            sc_img = get_random_img(config.SOUNCLOUD_IMG_URL) if str(streamtype) == "audio" else get_random_img(config.TELEGRAM_VIDEO_URL)
-
-            run = await message.reply_photo(
-                photo=sc_img,
-                caption=_["stream_1"].format(
-                    config.SUPPORT_CHAT, title[:23], check[0]["dur"], user
-                ),
-                reply_markup=InlineKeyboardMarkup(button),
-                has_spoiler=False 
+        # 🔥 Pura lamba code replace karke seedha change_stream call
+        # Yeh khud current track pop karega, agla play karega aur message bhejega.
+        # Queue khali hui toh automatically Autoplay handle kar lega.
+        await Lucky.change_stream(pytgcalls_client, chat_id)
+        
+    except Exception as e:
+        # Agar koi error aata hai toh gracefully stop kar denge
+        try:
+            await message.reply_text(
+                text=_["admin_6"].format(message.from_user.mention, message.chat.title),
+                reply_markup=close_markup(_)
             )
-            if db.get(chat_id) and len(db.get(chat_id)) > 0:
-                db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "tg"
-                
-        else:
-            button = stream_markup(_, chat_id)
-            img = await get_thumb(videoid, message.from_user.id, message.from_user.first_name)
-            if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
-
-            run = await message.reply_photo(
-                photo=img,
-                caption=_["stream_1"].format(
-                    f"https://t.me/{app.username}?start=info_{videoid}",
-                    title[:23],
-                    check[0]["dur"],
-                    user,
-                ),
-                reply_markup=InlineKeyboardMarkup(button),
-                has_spoiler=False 
-            )
-            if db.get(chat_id) and len(db.get(chat_id)) > 0:
-                db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "stream"
+            await Lucky.stop_stream(chat_id)
+        except:
+            pass
