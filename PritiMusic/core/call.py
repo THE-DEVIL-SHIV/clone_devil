@@ -58,13 +58,6 @@ try:
     loop.set_exception_handler(handle_asyncio_exceptions)
 except Exception:
     pass
-
-# ==========================================
-# 🎧 SPATIAL HIGH-FIDELITY AUDIO FILTER
-# ==========================================
-# This creates a "sweet", wide, and punchy sound signature by forcing 48kHz, 
-# widening the stereo field, boosting bass/treble slightly, and normalizing volume.
-DOLBY_FILTER = "-af aresample=48000,aformat=channel_layouts=stereo,extrastereo=m=1.5,bass=g=4,treble=g=3,loudnorm"
 # ==========================================
 
 autoend = {}
@@ -209,13 +202,13 @@ class Call(PyTgCalls):
                 out,
                 audio_parameters=HighQualityAudio(),
                 video_parameters=MediumQualityVideo(),
-                additional_ffmpeg_parameters=f"-ss {played} -to {duration} {DOLBY_FILTER}",
+                additional_ffmpeg_parameters=f"-ss {played} -to {duration}",
             )
             if playing[0]["streamtype"] == "video"
             else AudioPiped(
                 out,
                 audio_parameters=HighQualityAudio(),
-                additional_ffmpeg_parameters=f"-ss {played} -to {duration} {DOLBY_FILTER}",
+                additional_ffmpeg_parameters=f"-ss {played} -to {duration}",
             )
         )
         if str(db[chat_id][0]["file"]) == str(file_path):
@@ -240,9 +233,9 @@ class Call(PyTgCalls):
     async def skip_stream(self, chat_id: int, link: str, video: Union[bool, str] = None, image: Union[bool, str] = None, assistant_type=None):
         assistants = await self.get_active_clients(chat_id)
         if video:
-            stream = AudioVideoPiped(link, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo(), additional_ffmpeg_parameters=DOLBY_FILTER)
+            stream = AudioVideoPiped(link, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo())
         else:
-            stream = AudioPiped(link, audio_parameters=HighQualityAudio(), additional_ffmpeg_parameters=DOLBY_FILTER)
+            stream = AudioPiped(link, audio_parameters=HighQualityAudio())
         for assistant in assistants:
             try:
                 await assistant.change_stream(chat_id, stream)
@@ -256,13 +249,13 @@ class Call(PyTgCalls):
                 file_path,
                 audio_parameters=HighQualityAudio(),
                 video_parameters=MediumQualityVideo(),
-                additional_ffmpeg_parameters=f"-ss {to_seek} -to {duration} {DOLBY_FILTER}",
+                additional_ffmpeg_parameters=f"-ss {to_seek} -to {duration}",
             )
             if mode == "video"
             else AudioPiped(
                 file_path,
                 audio_parameters=HighQualityAudio(),
-                additional_ffmpeg_parameters=f"-ss {to_seek} -to {duration} {DOLBY_FILTER}",
+                additional_ffmpeg_parameters=f"-ss {to_seek} -to {duration}",
             )
         )
         for assistant in assistants:
@@ -275,7 +268,7 @@ class Call(PyTgCalls):
         assistant = await group_assistant(self, config.LOGGER_ID)
         await assistant.join_group_call(
             config.LOGGER_ID,
-            AudioVideoPiped(link, additional_ffmpeg_parameters=DOLBY_FILTER),
+            AudioVideoPiped(link),
             stream_type=StreamType().pulse_stream,
         )
         await asyncio.sleep(0.2)
@@ -317,11 +310,11 @@ class Call(PyTgCalls):
         language = await get_lang(chat_id)
         _ = get_string(language)
         if video:
-            stream = AudioVideoPiped(link, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo(), additional_ffmpeg_parameters=DOLBY_FILTER)
+            stream = AudioVideoPiped(link, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo())
         else:
             stream = (
-                AudioVideoPiped(link, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo(), additional_ffmpeg_parameters=DOLBY_FILTER)
-                if video else AudioPiped(link, audio_parameters=HighQualityAudio(), additional_ffmpeg_parameters=DOLBY_FILTER)
+                AudioVideoPiped(link, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo())
+                if video else AudioPiped(link, audio_parameters=HighQualityAudio())
             )
         try:
             await assistant_to_join.join_group_call(chat_id, stream, stream_type=StreamType().pulse_stream)
@@ -538,8 +531,8 @@ class Call(PyTgCalls):
             if "live_" in queued:
                 n, link = await YouTube.video(videoid, True)
                 if n == 0: return await chat_client.send_message(original_chat_id, text=_["call_6"])
-                if video: stream = AudioVideoPiped(link, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo(), additional_ffmpeg_parameters=DOLBY_FILTER)
-                else: stream = AudioPiped(link, audio_parameters=HighQualityAudio(), additional_ffmpeg_parameters=DOLBY_FILTER)
+                if video: stream = AudioVideoPiped(link, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo())
+                else: stream = AudioPiped(link, audio_parameters=HighQualityAudio())
                 try: await client.change_stream(chat_id, stream)
                 except Exception: return await chat_client.send_message(original_chat_id, text=_["call_6"])
                 button = telegram_markup(_, chat_id)
@@ -568,8 +561,8 @@ class Call(PyTgCalls):
                     except Exception: pass
                     return await self.change_stream(client, chat_id)
 
-                if video: stream = AudioVideoPiped(file_path, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo(), additional_ffmpeg_parameters=DOLBY_FILTER)
-                else: stream = AudioPiped(file_path, audio_parameters=HighQualityAudio(), additional_ffmpeg_parameters=DOLBY_FILTER)
+                if video: stream = AudioVideoPiped(file_path, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo())
+                else: stream = AudioPiped(file_path, audio_parameters=HighQualityAudio())
                 
                 try: await client.change_stream(chat_id, stream)
                 except: return await chat_client.send_message(original_chat_id, text=_["call_6"])
@@ -589,7 +582,7 @@ class Call(PyTgCalls):
                 db[chat_id][0]["markup"] = "stream"
                 
             elif "index_" in queued:
-                stream = (AudioVideoPiped(videoid, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo(), additional_ffmpeg_parameters=DOLBY_FILTER) if video else AudioPiped(videoid, audio_parameters=HighQualityAudio(), additional_ffmpeg_parameters=DOLBY_FILTER))
+                stream = (AudioVideoPiped(videoid, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo()) if video else AudioPiped(videoid, audio_parameters=HighQualityAudio()))
                 try: await client.change_stream(chat_id, stream)
                 except: return await chat_client.send_message(original_chat_id, text=_["call_6"])
                 button = telegram_markup(_, chat_id)
@@ -601,8 +594,8 @@ class Call(PyTgCalls):
                 db[chat_id][0]["markup"] = "tg"
                 
             else:
-                if video: stream = AudioVideoPiped(queued, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo(), additional_ffmpeg_parameters=DOLBY_FILTER)
-                else: stream = AudioPiped(queued, audio_parameters=HighQualityAudio(), additional_ffmpeg_parameters=DOLBY_FILTER)
+                if video: stream = AudioVideoPiped(queued, audio_parameters=HighQualityAudio(), video_parameters=MediumQualityVideo())
+                else: stream = AudioPiped(queued, audio_parameters=HighQualityAudio())
                 try: await client.change_stream(chat_id, stream)
                 except: return await chat_client.send_message(original_chat_id, text=_["call_6"])
                 
