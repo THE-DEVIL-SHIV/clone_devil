@@ -69,7 +69,7 @@ async def api_download(video_id: str, download_type: str, title: str = None) -> 
                 pass
         return None
 
-# 🛡️ FALLBACK METHOD
+# 🛡️ FALLBACK METHOD (UPDATED FOR 1080p/720p/480p OPTIMIZATION)
 async def ytdl_fallback_download(link: str, download_type: str, title: str = None) -> str:
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     video_id = link.split("v=")[-1].split("&")[0] if "v=" in link else link
@@ -80,8 +80,11 @@ async def ytdl_fallback_download(link: str, download_type: str, title: str = Non
     if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
         return file_path
 
+    # 🔥 MAGICAL LINE: Capped at 1080p, falls back to 720p, then best available mp4. Prevents 4K crashes.
+    video_format = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+    
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best' if download_type == "video" else 'bestaudio/best',
+        'format': video_format if download_type == "video" else 'bestaudio/best',
         'outtmpl': file_path,
         'quiet': True,
         'no_warnings': True,
