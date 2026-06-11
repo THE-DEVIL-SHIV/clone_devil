@@ -96,6 +96,9 @@ async def support_page_cb(client, CallbackQuery, _):
             InlineKeyboardButton(text="💬 sᴜᴘᴘᴏʀᴛ", url="https://t.me/betabot_support")
         ],
         [
+            InlineKeyboardButton(text="⌯❤️ ʙᴏᴛs ❤️⌯", url="https://t.me/betabot_hub/66")
+        ],
+        [
             InlineKeyboardButton(text="⌯ ʙᴀᴄᴋ ⌯", callback_data="settingsback_helper")
         ]
     ]
