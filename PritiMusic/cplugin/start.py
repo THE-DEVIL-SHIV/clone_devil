@@ -3,8 +3,8 @@ import random
 import asyncio
 import logging
 from pyrogram import filters, Client
-from pyrogram.enums import ChatType, ParseMode
-from pyrogram.types import InlineKeyboardMarkup, Message, InputMediaPhoto, InputMediaVideo
+from pyrogram.enums import ChatType, ParseMode, ButtonStyle
+from pyrogram.types import InlineKeyboardMarkup, Message, InputMediaPhoto, InputMediaVideo, InlineKeyboardButton
 # 👇 Yahan nayi library aa gayi hai
 from youtubesearchpython.__future__ import VideosSearch
 
@@ -28,14 +28,35 @@ from PritiMusic.utils.database import clonebotdb
 from PritiMusic.core.mongo import mongodb
 cloneownerdb = mongodb.cloneownerdb
 
-# Import your styled buttons here
-from button import styled_button, ButtonStyle
-
 # Initialize logging
 LOG = logging.getLogger(__name__)
 
+# 🔥 PREMIUM EMOJIS LIST 🔥
+PREMIUM_EMOJIS = [
+    "5422831825178206894", 
+    "5368324170673489600",
+    "5206607081334906820",
+    "5206380668048496464"
+]
+
+# 🎨 Dynamic Color Generator (Random Styles)
+def get_style_map():
+    styles = [ButtonStyle.PRIMARY, ButtonStyle.SUCCESS, ButtonStyle.DANGER]
+    random.shuffle(styles)
+    # Row me buttons ke hisaab se random color assign hoga
+    return {1: styles[0], 2: styles[1], 3: styles[2]}
+
+# 🔘 Smart Button Creator (Now with user_id support)
+def create_btn(text, cb=None, url=None, user_id=None, style=ButtonStyle.PRIMARY, no_emoji=False):
+    kwargs = {"text": text, "style": style}
+    if cb: kwargs["callback_data"] = cb
+    if url: kwargs["url"] = url
+    if user_id: kwargs["user_id"] = user_id
+    if not no_emoji: kwargs["icon_custom_emoji_id"] = random.choice(PREMIUM_EMOJIS)
+    return InlineKeyboardButton(**kwargs)
+
 # =====================================================================
-# INTERNAL BUTTON HELPERS (Defined inside same file)
+# INTERNAL BUTTON HELPERS
 # =====================================================================
 
 def make_start_panel(bot_username, owner_url, 
@@ -43,29 +64,29 @@ def make_start_panel(bot_username, owner_url,
                      support_chat, support_channel,
                      custom_btn=None, btn_pos="TOP"):
     
-    # Base Buttons
+    s_map = get_style_map()
     buttons = []
 
     # 1. Add to Group
     if txt_add != "HIDDEN":
-        buttons.append([styled_button(text=txt_add, url=f"https://t.me/{bot_username}?startgroup=true", style=ButtonStyle.SUCCESS)])
+        buttons.append([create_btn(text=txt_add, url=f"https://t.me/{bot_username}?startgroup=true", style=s_map[1])])
 
     # 2. Help Button
     if txt_help != "HIDDEN":
-        buttons.append([styled_button(text=txt_help, callback_data="settings_back_helper", style=ButtonStyle.PRIMARY)])
+        buttons.append([create_btn(text=txt_help, cb="settings_back_helper", style=s_map[1])])
 
-    # 3. Support & Channel (Row)
+    # 3. Support & Channel (Row of 2)
     row_support = []
     if txt_support != "HIDDEN":
-        row_support.append(styled_button(text=txt_support, url=support_chat, style=ButtonStyle.PRIMARY))
+        row_support.append(create_btn(text=txt_support, url=support_chat, style=s_map[2]))
     if txt_channel != "HIDDEN":
-        row_support.append(styled_button(text=txt_channel, url=support_channel, style=ButtonStyle.PRIMARY))
+        row_support.append(create_btn(text=txt_channel, url=support_channel, style=s_map[2]))
     if row_support:
         buttons.append(row_support)
 
     # 4. Owner Button
     if txt_owner != "HIDDEN":
-        buttons.append([styled_button(text=txt_owner, url=owner_url, style=ButtonStyle.PRIMARY)])
+        buttons.append([create_btn(text=txt_owner, url=owner_url, style=s_map[1])])
 
     # --- Custom Button Logic ---
     if custom_btn and custom_btn.get("text"):
@@ -77,14 +98,14 @@ def make_start_panel(bot_username, owner_url,
         elif not btn_url:
             btn_url = "https://t.me/Telegram"
             
-        c_btn = styled_button(text=custom_btn["text"], url=btn_url, style=ButtonStyle.PRIMARY)
+        # Custom button ko alag color code (s_map[3]) de dete hain randomly 
+        c_btn = create_btn(text=custom_btn["text"], url=btn_url, style=s_map[3])
         
         if btn_pos in ["UP", "TOP"]:
             buttons.insert(0, [c_btn])
         elif btn_pos in ["DOWN", "BOTTOM"]:
             buttons.append([c_btn])
         elif btn_pos in ["MID", "MIDDLE"]:
-            # Insert in middle (after Add to Group)
             if len(buttons) >= 1:
                 buttons.insert(1, [c_btn])
             else:
@@ -102,10 +123,11 @@ def make_start_panel(bot_username, owner_url,
 
 
 def make_gp_panel(bot_username, txt_add, txt_support, support_chat):
+    s_map = get_style_map()
     buttons = [
         [
-            styled_button(text=txt_add, url=f"https://t.me/{bot_username}?startgroup=true", style=ButtonStyle.SUCCESS),
-            styled_button(text=txt_support, url=support_chat, style=ButtonStyle.PRIMARY),
+            create_btn(text=txt_add, url=f"https://t.me/{bot_username}?startgroup=true", style=s_map[2]),
+            create_btn(text=txt_support, url=support_chat, style=s_map[2]),
         ]
     ]
     return InlineKeyboardMarkup(buttons)
@@ -161,7 +183,6 @@ async def add_start_content(bot_id, key, value):
     current = d.get(key)
     
     if current:
-        # Backward compatibility check
         if isinstance(current, dict):
             current = f"{current['text']} - {current['url']}" 
 
@@ -188,7 +209,7 @@ def format_link(val):
         return "https://t.me/Telegram" 
     val = str(val).strip()
     if val.startswith("@"):
-        val = val[1:] # Agar kisi ne @ lagaya hai toh use hata dega
+        val = val[1:] 
     if val.startswith(("https://", "http://", "tg://")):
         return val
     return f"https://t.me/{val}"
@@ -300,11 +321,12 @@ async def start_pm(client, message: Message, _):
         pass
 
     # Inline Arguments
+    s_map = get_style_map()
     if len(message.text.split()) > 1:
         arg = message.text.split(None, 1)[1]
         
         if arg.startswith("help"):
-            keyboard = InlineKeyboardMarkup([[styled_button(_["S_B_9"], url=C_SUPPORT_CHAT, style=ButtonStyle.PRIMARY)]])
+            keyboard = InlineKeyboardMarkup([[create_btn(text=_["S_B_9"], url=C_SUPPORT_CHAT, style=s_map[1])]])
             return await message.reply_photo(
                 photo=get_random_start_image(),
                 caption=_["help_1"].format(C_SUPPORT_CHAT),
@@ -321,7 +343,13 @@ async def start_pm(client, message: Message, _):
                 result = results["result"][0]
                 thumbnail = result["thumbnails"][0]["url"].split("?")[0]
                 caption = _["start_6"].format(result["title"], result["duration"], result["viewCount"]["short"], result["publishedTime"], result["channel"]["link"], result["channel"]["name"], a.mention)
-                key = InlineKeyboardMarkup([[styled_button(_["S_B_8"], url=result["link"], style=ButtonStyle.SUCCESS), styled_button(_["S_B_9"], url=C_SUPPORT_CHAT, style=ButtonStyle.PRIMARY)]])
+                
+                key = InlineKeyboardMarkup([
+                    [
+                        create_btn(text=_["S_B_8"], url=result["link"], style=s_map[2]), 
+                        create_btn(text=_["S_B_9"], url=C_SUPPORT_CHAT, style=s_map[2])
+                    ]
+                ])
                 await m.delete()
                 return await message.reply_photo(photo=thumbnail, caption=caption, reply_markup=key, has_spoiler=True)
             except Exception as e:
