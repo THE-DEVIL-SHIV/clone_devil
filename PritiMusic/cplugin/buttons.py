@@ -5,7 +5,7 @@ from PritiMusic import app
 import config
 from PritiMusic.utils.formatters import time_to_seconds
 
-from button import ButtonStyle
+from pyrogram.enums import ButtonStyle
 from pyrogram.types import InlineKeyboardButton
 
 # 🔥 PREMIUM EMOJIS LIST 🔥
