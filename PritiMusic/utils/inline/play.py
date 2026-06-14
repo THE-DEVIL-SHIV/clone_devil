@@ -1,7 +1,7 @@
 import math
 import random
 
-from pyrogram.enums import ButtonStyle
+from button import ButtonStyle
 from pyrogram.types import InlineKeyboardButton
 
 from config import SUPPORT_CHAT, OWNER_USERNAME
