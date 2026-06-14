@@ -172,7 +172,9 @@ async def clone_txt(client, message, _):
             return await message.reply_text(_["C_B_H_0"])
     
     if len(message.command) > 1:
-        bot_token = message.text.split("/clone", 1)[1].strip()
+        # --- FIX APPLIED HERE ---
+        # Safely splits the string by spaces, preventing IndexError regardless of the prefix used
+        bot_token = message.text.split(None, 1)[1].strip()
         mi = await message.reply_text(_["C_B_H_2"])
         
         # --- 🔥 STEP 1: Check DB First (Fixes Loop & Load) ---
