@@ -4,7 +4,7 @@ from typing import Union
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from PritiMusic import app
-from button import ButtonStyle  # ✅ Yahan typo fix kar diya gaya hai (ffrom -> from)
+from pyrogram.enums import ButtonStyle
 
 # 🔥 PREMIUM EMOJIS LIST 🔥
 PREMIUM_EMOJIS = [
