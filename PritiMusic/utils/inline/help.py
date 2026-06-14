@@ -1,7 +1,7 @@
 import random
 from typing import Union
 
-from pyrogram.enums import ButtonStyle
+ffrom button import ButtonStyle
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from PritiMusic import app
