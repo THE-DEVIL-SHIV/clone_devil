@@ -1,13 +1,12 @@
 import random
 from typing import Union
 
-ffrom button import ButtonStyle
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from PritiMusic import app
+from button import ButtonStyle  # ✅ Yahan typo fix kar diya gaya hai (ffrom -> from)
 
 # 🔥 PREMIUM EMOJIS LIST 🔥
-# Yahan aap apne pasand ke Premium Emojis ke IDs daal sakte hain.
 PREMIUM_EMOJIS = [
     "5422831825178206894", 
     "5368324170673489600", 
