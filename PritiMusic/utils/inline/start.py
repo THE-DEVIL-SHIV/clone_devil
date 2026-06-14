@@ -1,7 +1,6 @@
 import random
 from pyrogram.types import InlineKeyboardButton
-from button import ButtonStyle
-
+from pyrogram.enums import ButtonStyle
 import config
 from PritiMusic import app
 
